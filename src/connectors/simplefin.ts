@@ -61,11 +61,13 @@ export class SimpleFinClient {
 
   async fetchAccounts(options: SimpleFinFetchAccountsOptions = {}): Promise<SimpleFinAccountSet> {
     const url = this.buildAccountsUrl(options);
+    const authHeader = this.extractBasicAuthHeader(url);
     const response = await fetch(url, {
       method: "GET",
       headers: {
         "accept": "application/json",
-        "user-agent": "finance-reconcile-mcp/0.1"
+        "user-agent": "finance-reconcile-mcp/0.1",
+        ...(authHeader ? { "authorization": authHeader } : {})
       }
     });
 
@@ -141,6 +143,19 @@ export class SimpleFinClient {
     }
 
     return url;
+  }
+
+  private extractBasicAuthHeader(url: URL): string | undefined {
+    if (!url.username && !url.password) {
+      return undefined;
+    }
+
+    const username = decodeURIComponent(url.username);
+    const password = decodeURIComponent(url.password);
+    url.username = "";
+    url.password = "";
+
+    return `Basic ${Buffer.from(`${username}:${password}`, "utf8").toString("base64")}`;
   }
 }
 

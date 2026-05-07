@@ -6,6 +6,9 @@ This server is intentionally audit-only. It does not create, edit, delete, categ
 
 ## Tools
 
+- `setup_list_simplefin_accounts` lists SimpleFIN accounts for account mapping. It fetches balances only, not transactions.
+- `setup_list_firefly_accounts` lists Firefly III asset/liability accounts for account mapping.
+- `setup_suggest_account_map` suggests an `account-map.json` draft by comparing SimpleFIN and Firefly III account names, currencies, and balances.
 - `reconcile_find_missing_transactions` compares mapped SimpleFIN and Firefly III transactions and returns SimpleFIN transactions that appear missing from Firefly III.
 - `reconcile_check_stale_accounts` compares the latest transaction dates per mapped account.
 - `reconcile_check_balance_mismatches` compares SimpleFIN balances with Firefly III account balances.
@@ -40,6 +43,7 @@ https://user:password@bridge.simplefin.org/simplefin
 ```
 
 Treat this URL like a secret. It contains read credentials for the SimpleFIN account feed.
+The server accepts the credentialed Access URL from SimpleFIN and sends those credentials as an HTTP Basic Auth header internally.
 
 ## Install
 
@@ -93,6 +97,25 @@ Create `account-map.json` from `account-map.example.json`:
 ```
 
 Use `simplefin_id` when you know it. If you omit it, the server falls back to an exact SimpleFIN account name match.
+
+### Easier Setup With MCP Inspector
+
+After configuring `SIMPLEFIN_ACCESS_URL`, `FIREFLY_BASE_URL`, and `FIREFLY_PAT`, use these tools in MCP Inspector:
+
+1. Run `setup_suggest_account_map`.
+2. Review `suggestions`, especially low confidence matches and unmatched accounts.
+3. Put the returned `account_map_json_draft` into `account-map.json`.
+4. Run `reconcile_find_missing_transactions` with `{ "days": 30 }`.
+
+If the suggestions look wrong, use `setup_list_simplefin_accounts` and `setup_list_firefly_accounts` to inspect both sides directly and edit `account-map.json` by hand.
+
+The setup tools are also read-only. They do not write `account-map.json` and do not modify Firefly III.
+
+## Troubleshooting
+
+### SimpleFIN URL Includes Credentials
+
+SimpleFIN Access URLs usually look like `https://user:password@.../simplefin`. Keep that full URL in `SIMPLEFIN_ACCESS_URL`; the server strips the credentials from the request URL and sends them as an HTTP Basic Auth header. Do not manually remove the credentials unless your SimpleFIN provider has given you another authentication method.
 
 ## Development
 
