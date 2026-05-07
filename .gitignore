@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.env
+account-map.json
+*.log
+.idea

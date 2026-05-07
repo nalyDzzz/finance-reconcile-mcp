@@ -1,0 +1,10 @@
+{
+  "accounts": [
+    {
+      "simplefin_id": "optional-simplefin-id",
+      "simplefin_name": "CHASE TOTAL CHECKING (...1234)",
+      "firefly_account_id": "7",
+      "firefly_name": "Chase Checking"
+    }
+  ]
+}
