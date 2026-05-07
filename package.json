@@ -2,7 +2,25 @@
   "name": "finance-reconcile-mcp",
   "version": "0.1.0",
   "description": "Read-only MCP server for reconciling SimpleFIN Bridge against Firefly III.",
+  "license": "MIT",
   "type": "module",
+  "homepage": "https://github.com/nalyDzzz/finance-reconcile-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nalyDzzz/finance-reconcile-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nalyDzzz/finance-reconcile-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "simplefin",
+    "firefly-iii",
+    "finance",
+    "reconciliation",
+    "openclaw"
+  ],
   "bin": {
     "finance-reconcile-mcp": "./dist/index.js"
   },
