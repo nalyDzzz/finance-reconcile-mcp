@@ -7,6 +7,7 @@ export interface AppConfig {
   defaultLookbackDays: number;
   readonly: true;
   accountMappingFile: string;
+  accountMappingFileDefaulted: boolean;
 }
 
 export interface AccountMapping {

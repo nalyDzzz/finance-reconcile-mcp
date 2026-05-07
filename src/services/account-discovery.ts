@@ -1,6 +1,7 @@
 import type { FireflyResource } from "../connectors/firefly.js";
 import type { SimpleFinAccount } from "../connectors/simplefin.js";
 import type { AccountMapping } from "../types.js";
+import { findSimpleFinAccountForMapping } from "./account-mapping.js";
 import { descriptionSimilarity } from "./transaction-matching.js";
 import { maskIdentifier, roundMoney, roundScore } from "./masking.js";
 
@@ -27,6 +28,13 @@ export interface SuggestedAccountMapping {
   mapping: AccountMapping;
   simplefin_account: DiscoveredSimpleFinAccount;
   firefly_account: DiscoveredFireflyAccount;
+}
+
+export interface AccountMapValidationIssue {
+  severity: "error" | "warning";
+  code: string;
+  message: string;
+  account?: string;
 }
 
 export function describeSimpleFinAccounts(accounts: SimpleFinAccount[]): DiscoveredSimpleFinAccount[] {
@@ -90,6 +98,62 @@ export function buildAccountMapDraft(suggestions: SuggestedAccountMapping[]): { 
   return {
     accounts: suggestions.map((suggestion) => suggestion.mapping)
   };
+}
+
+export function validateAccountMapAgainstDiscoveredAccounts(
+  mappings: AccountMapping[],
+  simplefinAccounts: SimpleFinAccount[],
+  fireflyAccounts: DiscoveredFireflyAccount[]
+): AccountMapValidationIssue[] {
+  const issues: AccountMapValidationIssue[] = [];
+  const fireflyIds = new Set(fireflyAccounts.map((account) => account.firefly_account_id));
+  const seenFireflyIds = new Set<string>();
+  const seenSimplefinKeys = new Set<string>();
+
+  for (const mapping of mappings) {
+    const account = mapping.firefly_name ?? mapping.simplefin_name ?? mapping.firefly_account_id;
+    const simplefinKey = mapping.simplefin_id ?? `name:${mapping.simplefin_name ?? ""}`;
+
+    if (seenSimplefinKeys.has(simplefinKey)) {
+      issues.push({
+        severity: "warning",
+        code: "mapping.duplicate_simplefin_account",
+        message: "Multiple mappings refer to the same SimpleFIN account.",
+        account
+      });
+    }
+    seenSimplefinKeys.add(simplefinKey);
+
+    if (seenFireflyIds.has(mapping.firefly_account_id)) {
+      issues.push({
+        severity: "warning",
+        code: "mapping.duplicate_firefly_account",
+        message: "Multiple mappings refer to the same Firefly III account.",
+        account
+      });
+    }
+    seenFireflyIds.add(mapping.firefly_account_id);
+
+    if (!findSimpleFinAccountForMapping(simplefinAccounts, mapping)) {
+      issues.push({
+        severity: "error",
+        code: "mapping.simplefin_account_not_found",
+        message: "No SimpleFIN account matched this mapping by id or exact name.",
+        account
+      });
+    }
+
+    if (!fireflyIds.has(mapping.firefly_account_id)) {
+      issues.push({
+        severity: "error",
+        code: "mapping.firefly_account_not_found",
+        message: "No Firefly III account matched this mapping by account id.",
+        account
+      });
+    }
+  }
+
+  return issues;
 }
 
 function scoreAccountPair(

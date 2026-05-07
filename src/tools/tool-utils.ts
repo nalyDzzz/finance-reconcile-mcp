@@ -30,6 +30,13 @@ export const readOnlyAnnotations = {
   openWorldHint: true
 };
 
+export const localConfigWriteAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false
+};
+
 export function jsonToolResult(data: Record<string, unknown>): CallToolResult {
   return {
     structuredContent: data,
@@ -42,13 +49,13 @@ export function jsonToolResult(data: Record<string, unknown>): CallToolResult {
   };
 }
 
-export function jsonToolError(error: unknown): CallToolResult {
+export function jsonToolError(error: unknown, readOnly = true): CallToolResult {
   const message = error instanceof Error ? error.message : "Unknown error";
   return {
     isError: true,
     structuredContent: {
       error: message,
-      read_only: true
+      read_only: readOnly
     },
     content: [
       {
@@ -56,7 +63,7 @@ export function jsonToolError(error: unknown): CallToolResult {
         text: JSON.stringify(
           {
             error: message,
-            read_only: true
+            read_only: readOnly
           },
           null,
           2

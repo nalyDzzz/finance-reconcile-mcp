@@ -9,9 +9,12 @@ import { registerFireflySummarizeUncategorized } from "./tools/firefly-summarize
 import { registerReconcileCheckBalanceMismatches } from "./tools/reconcile-check-balance-mismatches.js";
 import { registerReconcileCheckStaleAccounts } from "./tools/reconcile-check-stale-accounts.js";
 import { registerReconcileFindMissingTransactions } from "./tools/reconcile-find-missing-transactions.js";
+import { registerSetupGetStatus } from "./tools/setup-get-status.js";
 import { registerSetupListFireflyAccounts } from "./tools/setup-list-firefly-accounts.js";
 import { registerSetupListSimpleFinAccounts } from "./tools/setup-list-simplefin-accounts.js";
+import { registerSetupSaveAccountMap } from "./tools/setup-save-account-map.js";
 import { registerSetupSuggestAccountMap } from "./tools/setup-suggest-account-map.js";
+import { registerSetupValidateAccountMap } from "./tools/setup-validate-account-map.js";
 import type { ToolDependencies } from "./tools/tool-utils.js";
 
 async function main(): Promise<void> {
@@ -32,9 +35,12 @@ async function main(): Promise<void> {
   registerReconcileCheckBalanceMismatches(server, deps);
   registerFireflyFindPossibleDuplicates(server, deps);
   registerFireflySummarizeUncategorized(server, deps);
+  registerSetupGetStatus(server, deps);
   registerSetupListSimpleFinAccounts(server, deps);
   registerSetupListFireflyAccounts(server, deps);
   registerSetupSuggestAccountMap(server, deps);
+  registerSetupValidateAccountMap(server, deps);
+  registerSetupSaveAccountMap(server, deps);
 
   await server.connect(new StdioServerTransport());
 }

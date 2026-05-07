@@ -11,7 +11,7 @@ Early MVP. The server is useful for local reconciliation experiments, but matchi
 ## Features
 
 - Read-only SimpleFIN and Firefly III connectors
-- Setup tools for discovering accounts and drafting `account-map.json`
+- Setup tools for discovering accounts, validating mappings, and saving local config
 - Missing transaction detection across mapped accounts
 - Stale account and balance mismatch checks
 - Duplicate transaction detection in Firefly III
@@ -24,34 +24,108 @@ Early MVP. The server is useful for local reconciliation experiments, but matchi
 - A SimpleFIN Access URL
 - A Firefly III Personal Access Token
 
-## Quick Start
+## Recommended Setup: OpenClaw + npx
+
+After this package is published to npm, users should not need to clone the repo. Register it as an OpenClaw MCP server with `npx`.
 
 ```sh
-git clone <repo-url>
-cd finance-reconcile-mcp
-npm install
-cp .env.example .env
-cp account-map.example.json account-map.json
+openclaw mcp set finance-reconcile '{
+  "command": "npx",
+  "args": ["-y", "finance-reconcile-mcp@latest"],
+  "env": {
+    "SIMPLEFIN_ACCESS_URL": "https://user:password@bridge.simplefin.org/simplefin",
+    "FIREFLY_BASE_URL": "https://firefly.example.com",
+    "FIREFLY_PAT": "your-firefly-token",
+    "DEFAULT_LOOKBACK_DAYS": "30",
+    "READONLY": "true"
+  }
+}'
 ```
 
-On Windows PowerShell:
+OpenClaw stores outbound MCP server definitions with `openclaw mcp set`. See the [OpenClaw MCP docs](https://docs.openclaw.ai/cli/mcp) for the full command surface.
 
-```powershell
-Copy-Item .env.example .env
-Copy-Item account-map.example.json account-map.json
+By default, the account map is stored at:
+
+- Linux/macOS: `~/.config/finance-reconcile-mcp/account-map.json`
+- Windows: `%APPDATA%\finance-reconcile-mcp\account-map.json`
+
+Set `ACCOUNT_MAPPING_FILE` only if you want a custom path.
+
+## OpenClaw User Flow
+
+Once the server is registered, ask OpenClaw:
+
+```text
+Check the setup status for my finance reconciliation MCP server.
 ```
 
-Edit `.env`, then build:
+OpenClaw should call `setup_get_status`.
 
-```sh
-npm run build
+Then ask:
+
+```text
+Suggest an account map for my SimpleFIN and Firefly accounts.
 ```
 
-Add the server to your MCP client, start it, then run `setup_suggest_account_map` to generate a draft account map.
+OpenClaw should call `setup_suggest_account_map`, then show you:
+
+- confidence-scored account matches
+- unmatched SimpleFIN accounts
+- unmatched Firefly III accounts
+- an `account_map_json_draft`
+
+Review the draft. If it looks right, ask:
+
+```text
+Save this account map for finance reconciliation.
+```
+
+OpenClaw can call `setup_save_account_map` with:
+
+```json
+{
+  "account_map": {
+    "accounts": [
+      {
+        "simplefin_id": "simplefin-account-id",
+        "simplefin_name": "CHASE TOTAL CHECKING (...1234)",
+        "firefly_account_id": "7",
+        "firefly_name": "Chase Checking"
+      }
+    ]
+  },
+  "overwrite": true,
+  "confirm_write": true
+}
+```
+
+`setup_save_account_map` only writes the local `account-map.json` config file. It never writes to Firefly III or SimpleFIN.
+
+Then validate:
+
+```text
+Validate my saved finance reconciliation account map.
+```
+
+OpenClaw should call `setup_validate_account_map`.
+
+Finally, reconcile:
+
+```text
+Find SimpleFIN transactions from the last 30 days that appear missing from Firefly.
+```
+
+OpenClaw should call `reconcile_find_missing_transactions` with:
+
+```json
+{
+  "days": 30
+}
+```
 
 ## Configuration
 
-Set these environment variables:
+Environment variables:
 
 ```env
 SIMPLEFIN_ACCESS_URL=https://user:password@bridge.simplefin.org/simplefin
@@ -59,7 +133,8 @@ FIREFLY_BASE_URL=https://your-firefly.example.com
 FIREFLY_PAT=your-personal-access-token
 DEFAULT_LOOKBACK_DAYS=30
 READONLY=true
-ACCOUNT_MAPPING_FILE=./account-map.json
+# Optional. Defaults to the user config directory.
+# ACCOUNT_MAPPING_FILE=/absolute/path/to/account-map.json
 ```
 
 Notes:
@@ -119,52 +194,46 @@ Create a Personal Access Token in Firefly III and set it as `FIREFLY_PAT`. The s
 
 Use `simplefin_id` when you know it. If you omit it, the server falls back to an exact SimpleFIN account name match.
 
-### Easier Setup With MCP Inspector
+## Generic MCP Client Configuration
 
-After configuring `SIMPLEFIN_ACCESS_URL`, `FIREFLY_BASE_URL`, and `FIREFLY_PAT`, use these tools in MCP Inspector:
-
-1. Run `setup_suggest_account_map`.
-2. Review `suggestions`, especially low-confidence matches and unmatched accounts.
-3. Put the returned `account_map_json_draft` into `account-map.json`.
-4. Restart the MCP server if your client does not reload environment/files automatically.
-5. Run `reconcile_find_missing_transactions` with `{ "days": 30 }`.
-
-If the suggestions look wrong, use `setup_list_simplefin_accounts` and `setup_list_firefly_accounts` to inspect both sides directly and edit `account-map.json`.
-
-The setup tools are read-only. They do not write `account-map.json` and do not modify Firefly III.
-
-## MCP Client Configuration
-
-Example config after running `npm run build`:
+If your MCP client uses JSON config directly:
 
 ```json
 {
   "mcpServers": {
     "finance-reconcile": {
-      "command": "node",
-      "args": ["/absolute/path/to/finance-reconcile-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "finance-reconcile-mcp@latest"],
       "env": {
         "SIMPLEFIN_ACCESS_URL": "https://user:password@bridge.simplefin.org/simplefin",
         "FIREFLY_BASE_URL": "https://your-firefly.example.com",
         "FIREFLY_PAT": "your-personal-access-token",
         "DEFAULT_LOOKBACK_DAYS": "30",
-        "READONLY": "true",
-        "ACCOUNT_MAPPING_FILE": "/absolute/path/to/finance-reconcile-mcp/account-map.json"
+        "READONLY": "true"
       }
     }
   }
 }
 ```
 
-On Windows, use an absolute path such as `C:/Users/you/code/finance-reconcile-mcp/dist/index.js`.
+For a custom account-map path, add:
+
+```json
+{
+  "ACCOUNT_MAPPING_FILE": "/absolute/path/to/account-map.json"
+}
+```
 
 ## Tools
 
 Setup:
 
+- `setup_get_status` shows configuration and account-map status.
 - `setup_list_simplefin_accounts` lists SimpleFIN accounts for account mapping. It fetches balances only, not transactions.
 - `setup_list_firefly_accounts` lists Firefly III asset/liability accounts for account mapping.
 - `setup_suggest_account_map` suggests an `account-map.json` draft by comparing SimpleFIN and Firefly III account names, currencies, and balances.
+- `setup_validate_account_map` validates an account-map object or the configured file, optionally checking live accounts.
+- `setup_save_account_map` writes the local `account-map.json` config file after `confirm_write: true`. It does not mutate financial data.
 
 Reconciliation:
 
@@ -176,8 +245,6 @@ Firefly III audit helpers:
 
 - `firefly_find_possible_duplicates` finds possible duplicate Firefly III transactions.
 - `firefly_summarize_uncategorized` groups uncategorized Firefly III transactions and suggests category labels without applying them.
-
-All tools return compact JSON and are annotated with MCP read-only hints.
 
 ## Tool Examples
 
@@ -213,6 +280,51 @@ Use a fixed date range:
 }
 ```
 
+## From Source
+
+Use this path for development or until the package is published to npm.
+
+```sh
+git clone <repo-url>
+cd finance-reconcile-mcp
+npm install
+cp .env.example .env
+npm run build
+npm start
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+For a source checkout, you can point OpenClaw at the built file:
+
+```sh
+openclaw mcp set finance-reconcile '{
+  "command": "node",
+  "args": ["/absolute/path/to/finance-reconcile-mcp/dist/index.js"],
+  "cwd": "/absolute/path/to/finance-reconcile-mcp",
+  "env": {
+    "SIMPLEFIN_ACCESS_URL": "https://user:password@bridge.simplefin.org/simplefin",
+    "FIREFLY_BASE_URL": "https://firefly.example.com",
+    "FIREFLY_PAT": "your-firefly-token",
+    "READONLY": "true"
+  }
+}'
+```
+
+## Development
+
+```sh
+npm run dev
+npm run typecheck
+npm run build
+```
+
+`npm pack` and `npm publish` run `npm run build` automatically through the `prepack` script.
+
 ## Matching Design
 
 Transactions are normalized into a shared internal type before matching. Account mapping is required. Matching uses a score from 0 to 1:
@@ -223,21 +335,6 @@ Transactions are normalized into a shared internal type before matching. Account
 - shared external transaction ID: immediate high confidence
 
 The server masks source account and transaction identifiers in returned JSON where possible and never logs secrets.
-
-## Development
-
-```sh
-npm run dev
-```
-
-The server speaks MCP over stdio, so it should be launched by an MCP client rather than opened in a browser.
-
-## Build
-
-```sh
-npm run build
-npm start
-```
 
 ## Troubleshooting
 
@@ -255,8 +352,9 @@ An empty result can mean Firefly III is up to date, the date range is too narrow
 
 ## Security Model
 
-- This server is designed to be read-only.
+- This server is designed to be read-only for financial systems.
 - No Firefly III write endpoints are implemented.
 - No SimpleFIN mutation endpoints exist in this project.
+- `setup_save_account_map` only writes local config after explicit confirmation.
 - Secrets are read from environment variables and are not logged intentionally.
 - Returned account and transaction identifiers are masked where possible.
