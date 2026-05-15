@@ -37,6 +37,8 @@ export function registerSetupGetStatus(server: McpServer, deps: ToolDependencies
             default_lookback_days: deps.config.defaultLookbackDays,
             readonly: deps.config.readonly,
             mock_data: deps.config.mockData,
+            ignored_findings_file: deps.config.ignoredFindingsFile,
+            audit_history_file: deps.config.auditHistoryFile,
             simplefin_configured: true,
             firefly_configured: true
           },

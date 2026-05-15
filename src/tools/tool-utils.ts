@@ -35,6 +35,13 @@ export const readOnlyAnnotations = {
   openWorldHint: true
 };
 
+export const localAuditPersistenceAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: true
+};
+
 export const localConfigWriteAnnotations = {
   readOnlyHint: false,
   destructiveHint: false,

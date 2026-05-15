@@ -6,7 +6,7 @@ This project is for audit and reconciliation workflows. It does not create, edit
 
 ## Status
 
-Early MVP. The server is useful for local reconciliation experiments, but matching heuristics and account mapping should be reviewed before trusting the output.
+v0.2.0 focuses on audit usability: compact audit output by default, stable finding fingerprints, local ignored findings, and local audit history. Matching heuristics and account mapping should still be reviewed before trusting the output.
 
 ## Features
 
@@ -16,6 +16,8 @@ Early MVP. The server is useful for local reconciliation experiments, but matchi
 - Stale account and balance mismatch checks
 - Duplicate transaction detection in Firefly III
 - Uncategorized transaction summaries with suggested category labels
+- Stable fingerprints for repeat audit findings
+- Local ignored-finding and audit-history files
 - Compact JSON responses designed for AI agents and MCP clients
 
 ## Requirements
@@ -50,6 +52,13 @@ By default, the account map is stored at:
 - Windows: `%APPDATA%\finance-reconcile-mcp\account-map.json`
 
 Set `ACCOUNT_MAPPING_FILE` only if you want a custom path.
+
+Ignored findings and audit history default to:
+
+- `~/.config/finance-reconcile-mcp/ignored-findings.json`
+- `~/.config/finance-reconcile-mcp/audit-history.json`
+
+Set `IGNORED_FINDINGS_FILE` or `AUDIT_HISTORY_FILE` only if you want custom local paths.
 
 ## OpenClaw User Flow
 
@@ -123,6 +132,56 @@ OpenClaw should call `reconcile_find_missing_transactions` with:
 }
 ```
 
+## v0.2 Audit Workflow
+
+Run the compact audit first:
+
+```text
+Run a compact finance reconciliation audit for the last 30 days.
+```
+
+The `reconcile_run_audit` tool returns `status`, `summary`, `recommended_actions`, `since_last_audit`, and `top_findings`. It also writes a compact local audit-history snapshot with active finding fingerprints. This local write never creates, edits, categorizes, merges, or deletes financial data in Firefly III or SimpleFIN.
+
+Inspect full details when needed:
+
+```json
+{
+  "days": 30,
+  "include_details": true
+}
+```
+
+Ignore a finding after reviewing its fingerprint:
+
+```json
+{
+  "fingerprint": "missing_transaction:example",
+  "type": "missing_transaction",
+  "reason": "Known historical import gap"
+}
+```
+
+Use `setup_ignore_finding` for that local ignore. Future audits exclude ignored findings from active counts by default. To inspect ignored findings alongside the audit:
+
+```json
+{
+  "days": 30,
+  "include_ignored": true
+}
+```
+
+Every successful audit compares active finding fingerprints with the previous local snapshot:
+
+```json
+{
+  "since_last_audit": {
+    "new_findings": 0,
+    "resolved_findings": 1,
+    "unchanged_findings": 6
+  }
+}
+```
+
 ## Configuration
 
 Environment variables:
@@ -136,6 +195,10 @@ READONLY=true
 MOCK_DATA=false
 # Optional. Defaults to the user config directory.
 # ACCOUNT_MAPPING_FILE=/absolute/path/to/account-map.json
+# Optional. Defaults to ~/.config/finance-reconcile-mcp/ignored-findings.json
+# IGNORED_FINDINGS_FILE=/absolute/path/to/ignored-findings.json
+# Optional. Defaults to ~/.config/finance-reconcile-mcp/audit-history.json
+# AUDIT_HISTORY_FILE=/absolute/path/to/audit-history.json
 ```
 
 Notes:
@@ -251,10 +314,13 @@ Setup:
 - `setup_suggest_account_map` suggests an `account-map.json` draft by comparing SimpleFIN and Firefly III account names, currencies, and balances.
 - `setup_validate_account_map` validates an account-map object or the configured file, optionally checking live accounts.
 - `setup_save_account_map` writes the local `account-map.json` config file after `confirm_write: true`. It does not mutate financial data.
+- `setup_list_ignored_findings` lists locally ignored finding fingerprints.
+- `setup_ignore_finding` writes a finding fingerprint to the local ignored-findings file.
+- `setup_unignore_finding` removes a finding fingerprint from the local ignored-findings file.
 
 Reconciliation:
 
-- `reconcile_run_audit` runs the full read-only audit and returns status, counts, recommended actions, and details.
+- `reconcile_run_audit` runs the full audit without mutating financial systems. It returns compact output by default and writes a local audit-history snapshot.
 - `reconcile_find_missing_transactions` compares mapped SimpleFIN and Firefly III transactions and returns SimpleFIN transactions that appear missing from Firefly III.
 - `reconcile_check_stale_accounts` compares the latest transaction dates per mapped account.
 - `reconcile_check_balance_mismatches` compares SimpleFIN balances with Firefly III account balances.
@@ -266,11 +332,50 @@ Firefly III audit helpers:
 
 ## Tool Examples
 
-Run the full audit:
+Run the compact audit:
 
 ```json
 {
   "days": 30
+}
+```
+
+Limit compact output:
+
+```json
+{
+  "days": 30,
+  "max_missing": 5,
+  "max_duplicates": 5,
+  "max_uncategorized_groups": 5
+}
+```
+
+Inspect full audit details:
+
+```json
+{
+  "days": 30,
+  "include_details": true
+}
+```
+
+Show ignored findings in the audit output:
+
+```json
+{
+  "days": 30,
+  "include_ignored": true
+}
+```
+
+Ignore a reviewed finding locally:
+
+```json
+{
+  "fingerprint": "duplicate_group:example",
+  "type": "duplicate_group",
+  "reason": "Reviewed and accepted duplicate-looking transfer split"
 }
 ```
 
@@ -397,6 +502,8 @@ An empty result can mean Firefly III is up to date, the date range is too narrow
 - This server is designed to be read-only for financial systems.
 - No Firefly III write endpoints are implemented.
 - No SimpleFIN mutation endpoints exist in this project.
+- `reconcile_run_audit` writes local audit-history JSON only.
+- Ignored-finding tools write local ignored-findings JSON only.
 - `setup_save_account_map` only writes local config after explicit confirmation.
 - Secrets are read from environment variables and are not logged intentionally.
 - Returned account and transaction identifiers are masked where possible.

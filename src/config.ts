@@ -13,7 +13,9 @@ const EnvSchema = z.object({
   DEFAULT_LOOKBACK_DAYS: z.coerce.number().int().positive().max(3650).default(30),
   READONLY: z.enum(["true", "false", "1", "0"]).default("true"),
   MOCK_DATA: z.enum(["true", "false", "1", "0"]).default("false"),
-  ACCOUNT_MAPPING_FILE: optionalString
+  ACCOUNT_MAPPING_FILE: optionalString,
+  IGNORED_FINDINGS_FILE: optionalString,
+  AUDIT_HISTORY_FILE: optionalString
 });
 
 function stripTrailingSlash(value: string): string {
@@ -29,6 +31,10 @@ function defaultAccountMappingFile(env: NodeJS.ProcessEnv): string {
   return path.join(baseConfigDir, "finance-reconcile-mcp", "account-map.json");
 }
 
+function defaultUserConfigFile(fileName: string): string {
+  return path.join(os.homedir(), ".config", "finance-reconcile-mcp", fileName);
+}
+
 function expandHomePath(filePath: string): string {
   if (filePath === "~") {
     return os.homedir();
@@ -42,6 +48,11 @@ function expandHomePath(filePath: string): string {
 }
 
 function resolveAccountMappingFile(filePath: string): string {
+  const expanded = expandHomePath(filePath);
+  return path.isAbsolute(expanded) ? path.normalize(expanded) : path.resolve(process.cwd(), expanded);
+}
+
+function resolveConfigFile(filePath: string): string {
   const expanded = expandHomePath(filePath);
   return path.isAbsolute(expanded) ? path.normalize(expanded) : path.resolve(process.cwd(), expanded);
 }
@@ -77,6 +88,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const accountMappingFile = resolveAccountMappingFile(
     parsed.data.ACCOUNT_MAPPING_FILE ?? defaultAccountMappingFile(env)
   );
+  const ignoredFindingsFile = resolveConfigFile(
+    parsed.data.IGNORED_FINDINGS_FILE ?? defaultUserConfigFile("ignored-findings.json")
+  );
+  const auditHistoryFile = resolveConfigFile(
+    parsed.data.AUDIT_HISTORY_FILE ?? defaultUserConfigFile("audit-history.json")
+  );
 
   return {
     simpleFinAccessUrl: parsed.data.SIMPLEFIN_ACCESS_URL ?? "https://mock.simplefin.local/simplefin",
@@ -86,6 +103,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     readonly: true,
     mockData,
     accountMappingFile,
-    accountMappingFileDefaulted
+    accountMappingFileDefaulted,
+    ignoredFindingsFile,
+    auditHistoryFile
   };
 }

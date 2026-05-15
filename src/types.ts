@@ -9,6 +9,8 @@ export interface AppConfig {
   mockData: boolean;
   accountMappingFile: string;
   accountMappingFileDefaulted: boolean;
+  ignoredFindingsFile: string;
+  auditHistoryFile: string;
 }
 
 export interface AccountMapping {
@@ -34,6 +36,22 @@ export interface DateRangeInput {
   days?: number;
   account?: string;
 }
+
+export interface AuditRunInput extends DateRangeInput {
+  include_details?: boolean;
+  max_missing?: number;
+  max_duplicates?: number;
+  max_uncategorized_groups?: number;
+  min_duplicate_confidence?: number;
+  include_ignored?: boolean;
+}
+
+export type FindingType =
+  | "missing_transaction"
+  | "duplicate_group"
+  | "balance_mismatch"
+  | "stale_account"
+  | "uncategorized_group";
 
 export interface NormalizedAccount {
   source: SourceSystem;

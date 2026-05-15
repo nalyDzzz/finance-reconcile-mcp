@@ -148,7 +148,7 @@ export class FireflyClient {
       headers: {
         "accept": "application/vnd.api+json, application/json",
         "authorization": `Bearer ${this.personalAccessToken}`,
-        "user-agent": "finance-reconcile-mcp/0.1"
+        "user-agent": "finance-reconcile-mcp/0.2"
       }
     });
 
