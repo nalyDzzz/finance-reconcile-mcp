@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { FireflyClient } from "../connectors/firefly.js";
 import type { SimpleFinClient } from "../connectors/simplefin.js";
+import { MOCK_ACCOUNT_MAP } from "../fixtures/mock-data.js";
 import type { AppConfig, DateRangeInput } from "../types.js";
 import { filterMappings, loadAccountMap } from "../services/account-mapping.js";
 
@@ -19,6 +20,10 @@ export interface ToolDependencies {
 }
 
 export async function loadSelectedMappings(deps: ToolDependencies, input: DateRangeInput) {
+  if (deps.config.mockData) {
+    return filterMappings(MOCK_ACCOUNT_MAP.accounts, input.account);
+  }
+
   const accountMap = await loadAccountMap(deps.config.accountMappingFile);
   return filterMappings(accountMap.accounts, input.account);
 }

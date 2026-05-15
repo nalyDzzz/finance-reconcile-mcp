@@ -18,6 +18,7 @@ This project handles sensitive financial metadata, so the contribution bar is mo
 ```sh
 npm install
 npm run typecheck
+npm test
 npm run build
 ```
 
@@ -38,6 +39,7 @@ Copy-Item .env.example .env
 ```sh
 npm run dev
 npm run typecheck
+npm test
 npm run build
 npm pack --dry-run
 ```
@@ -51,6 +53,7 @@ npm pack --dry-run
 - New provider data is normalized before matching or summarizing.
 - Tool output is compact JSON and avoids unnecessary secrets or raw IDs.
 - `npm run typecheck` passes.
+- `npm test` passes.
 - `npm run build` passes.
 - Documentation is updated when behavior or setup changes.
 

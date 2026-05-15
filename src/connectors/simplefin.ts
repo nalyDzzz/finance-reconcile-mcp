@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AccountMapping, NormalizedAccount, NormalizedTransaction, ServiceWarning } from "../types.js";
+import { MOCK_SIMPLEFIN_ACCOUNTS, inEpochRange } from "../fixtures/mock-data.js";
 import { addDays, epochSecondsToDate, toEpochSeconds } from "../services/date-utils.js";
 
 const SimpleFinErrorSchema = z.object({
@@ -57,9 +58,16 @@ export interface SimpleFinAccountSet {
 }
 
 export class SimpleFinClient {
-  constructor(private readonly accessUrl: string) {}
+  constructor(
+    private readonly accessUrl: string,
+    private readonly options: { mockData?: boolean } = {}
+  ) {}
 
   async fetchAccounts(options: SimpleFinFetchAccountsOptions = {}): Promise<SimpleFinAccountSet> {
+    if (this.options.mockData) {
+      return this.fetchMockAccounts(options);
+    }
+
     const url = this.buildAccountsUrl(options);
     const authHeader = this.extractBasicAuthHeader(url);
     const response = await fetch(url, {
@@ -111,6 +119,29 @@ export class SimpleFinClient {
     return {
       accounts: parsed.data.accounts,
       warnings
+    };
+  }
+
+  private fetchMockAccounts(options: SimpleFinFetchAccountsOptions): SimpleFinAccountSet {
+    const accountIdFilter = new Set(options.accountIds ?? []);
+    const filtered = MOCK_SIMPLEFIN_ACCOUNTS
+      .filter((account) => accountIdFilter.size === 0 || accountIdFilter.has(account.id))
+      .map((account) => {
+        const copy = structuredClone(account);
+        if (options.balancesOnly) {
+          delete copy.transactions;
+          return copy;
+        }
+
+        copy.transactions = (copy.transactions ?? []).filter((transaction) =>
+          inEpochRange(transaction.posted, options.startDate, options.endDate)
+        );
+        return copy;
+      });
+
+    return {
+      accounts: filtered,
+      warnings: []
     };
   }
 

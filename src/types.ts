@@ -6,6 +6,7 @@ export interface AppConfig {
   fireflyPat: string;
   defaultLookbackDays: number;
   readonly: true;
+  mockData: boolean;
   accountMappingFile: string;
   accountMappingFileDefaulted: boolean;
 }

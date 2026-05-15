@@ -3,13 +3,17 @@ import path from "node:path";
 import { z } from "zod";
 import type { AppConfig } from "./types.js";
 
+const optionalString = z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional());
+const optionalUrl = z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional());
+
 const EnvSchema = z.object({
-  SIMPLEFIN_ACCESS_URL: z.string().url(),
-  FIREFLY_BASE_URL: z.string().url(),
-  FIREFLY_PAT: z.string().min(1),
+  SIMPLEFIN_ACCESS_URL: optionalUrl,
+  FIREFLY_BASE_URL: optionalUrl,
+  FIREFLY_PAT: optionalString,
   DEFAULT_LOOKBACK_DAYS: z.coerce.number().int().positive().max(3650).default(30),
   READONLY: z.enum(["true", "false", "1", "0"]).default("true"),
-  ACCOUNT_MAPPING_FILE: z.string().min(1).optional()
+  MOCK_DATA: z.enum(["true", "false", "1", "0"]).default("false"),
+  ACCOUNT_MAPPING_FILE: optionalString
 });
 
 function stripTrailingSlash(value: string): string {
@@ -54,17 +58,33 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("This MCP server is read-only and requires READONLY=true.");
   }
 
+  const mockData = parsed.data.MOCK_DATA === "true" || parsed.data.MOCK_DATA === "1";
+  if (!mockData) {
+    const missing = [
+      ["SIMPLEFIN_ACCESS_URL", parsed.data.SIMPLEFIN_ACCESS_URL],
+      ["FIREFLY_BASE_URL", parsed.data.FIREFLY_BASE_URL],
+      ["FIREFLY_PAT", parsed.data.FIREFLY_PAT]
+    ]
+      .filter(([, value]) => !value)
+      .map(([name]) => name);
+
+    if (missing.length > 0) {
+      throw new Error(`Missing required configuration: ${missing.join(", ")}.`);
+    }
+  }
+
   const accountMappingFileDefaulted = !parsed.data.ACCOUNT_MAPPING_FILE;
   const accountMappingFile = resolveAccountMappingFile(
     parsed.data.ACCOUNT_MAPPING_FILE ?? defaultAccountMappingFile(env)
   );
 
   return {
-    simpleFinAccessUrl: parsed.data.SIMPLEFIN_ACCESS_URL,
-    fireflyBaseUrl: stripTrailingSlash(parsed.data.FIREFLY_BASE_URL),
-    fireflyPat: parsed.data.FIREFLY_PAT,
+    simpleFinAccessUrl: parsed.data.SIMPLEFIN_ACCESS_URL ?? "https://mock.simplefin.local/simplefin",
+    fireflyBaseUrl: stripTrailingSlash(parsed.data.FIREFLY_BASE_URL ?? "https://mock.firefly.local"),
+    fireflyPat: parsed.data.FIREFLY_PAT ?? "mock-token",
     defaultLookbackDays: parsed.data.DEFAULT_LOOKBACK_DAYS,
     readonly: true,
+    mockData,
     accountMappingFile,
     accountMappingFileDefaulted
   };

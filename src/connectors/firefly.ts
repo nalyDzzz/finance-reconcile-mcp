@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AccountMapping, NormalizedAccount, NormalizedTransaction } from "../types.js";
+import { MOCK_FIREFLY_ACCOUNTS, MOCK_FIREFLY_TRANSACTION_GROUPS } from "../fixtures/mock-data.js";
 import { coerceDateTimeToDate } from "../services/date-utils.js";
 
 const FireflyResourceSchema = z.object({
@@ -40,12 +41,24 @@ export interface FireflyListAccountsOptions {
 export class FireflyClient {
   private readonly apiBaseUrl: string;
 
-  constructor(baseUrl: string, private readonly personalAccessToken: string) {
+  constructor(
+    baseUrl: string,
+    private readonly personalAccessToken: string,
+    private readonly options: { mockData?: boolean } = {}
+  ) {
     const stripped = baseUrl.replace(/\/+$/, "");
     this.apiBaseUrl = stripped.endsWith("/api/v1") ? stripped : `${stripped}/api/v1`;
   }
 
   async getAccount(accountId: string, date?: string): Promise<FireflyResource> {
+    if (this.options.mockData) {
+      const account = MOCK_FIREFLY_ACCOUNTS.find((item) => item.id === accountId);
+      if (!account) {
+        throw new Error(`Mock Firefly III account not found: ${accountId}.`);
+      }
+      return structuredClone(account);
+    }
+
     const params = date ? { date } : undefined;
     const json = await this.request(`/accounts/${encodeURIComponent(accountId)}`, params);
     const parsed = FireflySingleSchema.safeParse(json);
@@ -57,6 +70,13 @@ export class FireflyClient {
   }
 
   async listAccounts(options: FireflyListAccountsOptions = {}): Promise<FireflyResource[]> {
+    if (this.options.mockData) {
+      return structuredClone(MOCK_FIREFLY_ACCOUNTS).filter((account) => {
+        const type = account.attributes.type;
+        return !options.type || type === options.type;
+      });
+    }
+
     const params: Record<string, string> = {};
     if (options.type) {
       params.type = options.type;
@@ -69,10 +89,20 @@ export class FireflyClient {
     accountId: string,
     options: FireflyListTransactionsOptions = {}
   ): Promise<FireflyResource[]> {
+    if (this.options.mockData) {
+      return filterMockTransactionGroups(options).filter((group) =>
+        groupTouchesAccount(group, accountId)
+      );
+    }
+
     return this.paginated(`/accounts/${encodeURIComponent(accountId)}/transactions`, dateParams(options));
   }
 
   async listTransactions(options: FireflyListTransactionsOptions = {}): Promise<FireflyResource[]> {
+    if (this.options.mockData) {
+      return filterMockTransactionGroups(options);
+    }
+
     return this.paginated("/transactions", dateParams(options));
   }
 
@@ -141,6 +171,40 @@ export class FireflyClient {
       throw new Error("Firefly III returned a non-JSON response.");
     }
   }
+}
+
+function filterMockTransactionGroups(options: FireflyListTransactionsOptions): FireflyResource[] {
+  return structuredClone(MOCK_FIREFLY_TRANSACTION_GROUPS).filter((group) => {
+    const splits = Array.isArray(group.attributes.transactions) ? group.attributes.transactions : [];
+    return splits.some((splitValue) => {
+      if (!splitValue || typeof splitValue !== "object") {
+        return false;
+      }
+      const date = coerceDateTimeToDate((splitValue as Record<string, unknown>).date);
+      return date ? inDateRange(date, options.startDate, options.endDate) : false;
+    });
+  });
+}
+
+function groupTouchesAccount(group: FireflyResource, accountId: string): boolean {
+  const splits = Array.isArray(group.attributes.transactions) ? group.attributes.transactions : [];
+  return splits.some((splitValue) => {
+    if (!splitValue || typeof splitValue !== "object") {
+      return false;
+    }
+    const split = splitValue as Record<string, unknown>;
+    return split.source_id === accountId || split.destination_id === accountId;
+  });
+}
+
+function inDateRange(date: string, startDate?: string, endDate?: string): boolean {
+  if (startDate && date < startDate) {
+    return false;
+  }
+  if (endDate && date > endDate) {
+    return false;
+  }
+  return true;
 }
 
 function dateParams(options: FireflyListTransactionsOptions): Record<string, string> {

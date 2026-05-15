@@ -133,6 +133,7 @@ FIREFLY_BASE_URL=https://your-firefly.example.com
 FIREFLY_PAT=your-personal-access-token
 DEFAULT_LOOKBACK_DAYS=30
 READONLY=true
+MOCK_DATA=false
 # Optional. Defaults to the user config directory.
 # ACCOUNT_MAPPING_FILE=/absolute/path/to/account-map.json
 ```
@@ -140,9 +141,25 @@ READONLY=true
 Notes:
 
 - `READONLY=false` is rejected at startup.
+- `MOCK_DATA=true` runs deterministic fixtures and does not require SimpleFIN or Firefly credentials.
 - `SIMPLEFIN_ACCESS_URL` may be the SimpleFIN root Access URL or the `/accounts` URL.
 - SimpleFIN Access URLs usually contain credentials. Keep the full URL; the server sends those credentials as an HTTP Basic Auth header internally.
 - Do not commit `.env` or `account-map.json`.
+
+## CLI Checks
+
+These commands do not start the MCP server and do not print secrets:
+
+```sh
+finance-reconcile-mcp --version
+finance-reconcile-mcp --check-config
+```
+
+For a safe fixture check:
+
+```sh
+MOCK_DATA=true finance-reconcile-mcp --check-config
+```
 
 ## Get A SimpleFIN Access URL
 
@@ -237,6 +254,7 @@ Setup:
 
 Reconciliation:
 
+- `reconcile_run_audit` runs the full read-only audit and returns status, counts, recommended actions, and details.
 - `reconcile_find_missing_transactions` compares mapped SimpleFIN and Firefly III transactions and returns SimpleFIN transactions that appear missing from Firefly III.
 - `reconcile_check_stale_accounts` compares the latest transaction dates per mapped account.
 - `reconcile_check_balance_mismatches` compares SimpleFIN balances with Firefly III account balances.
@@ -247,6 +265,14 @@ Firefly III audit helpers:
 - `firefly_summarize_uncategorized` groups uncategorized Firefly III transactions and suggests category labels without applying them.
 
 ## Tool Examples
+
+Run the full audit:
+
+```json
+{
+  "days": 30
+}
+```
 
 Find missing transactions over the default lookback window:
 
@@ -320,10 +346,26 @@ openclaw mcp set finance-reconcile '{
 ```sh
 npm run dev
 npm run typecheck
+npm test
 npm run build
 ```
 
 `npm pack` and `npm publish` run `npm run build` automatically through the `prepack` script.
+
+### Mock Mode
+
+Set `MOCK_DATA=true` to run against deterministic fixtures instead of real HTTP connectors. The fixture set includes one missing transaction, one duplicate Firefly transaction group, one stale account, one balance mismatch, and uncategorized transactions.
+
+Example MCP client env:
+
+```json
+{
+  "MOCK_DATA": "true",
+  "READONLY": "true"
+}
+```
+
+Then call `reconcile_run_audit` with `{ "days": 30 }`.
 
 ## Matching Design
 

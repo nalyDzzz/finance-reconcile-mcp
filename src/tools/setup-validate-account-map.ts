@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { MOCK_ACCOUNT_MAP } from "../fixtures/mock-data.js";
 import { describeFireflyAccounts, validateAccountMapAgainstDiscoveredAccounts } from "../services/account-discovery.js";
 import { inspectAccountMap, validateAccountMap } from "../services/account-mapping.js";
 import {
@@ -29,6 +30,8 @@ export function registerSetupValidateAccountMap(server: McpServer, deps: ToolDep
         const checkRemote = input.check_remote ?? true;
         const accountMap = input.account_map
           ? validateAccountMap(input.account_map)
+          : deps.config.mockData
+            ? MOCK_ACCOUNT_MAP
           : await loadConfiguredAccountMapForValidation(deps.config.accountMappingFile);
         const issues = [];
 
