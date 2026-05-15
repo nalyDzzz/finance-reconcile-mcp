@@ -39,6 +39,7 @@ export function registerSetupGetStatus(server: McpServer, deps: ToolDependencies
             mock_data: deps.config.mockData,
             ignored_findings_file: deps.config.ignoredFindingsFile,
             audit_history_file: deps.config.auditHistoryFile,
+            category_rules_file: deps.config.categoryRulesFile,
             simplefin_configured: true,
             firefly_configured: true
           },

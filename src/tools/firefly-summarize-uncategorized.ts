@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { loadCategoryRules } from "../services/category-rules.js";
 import { summarizeUncategorized } from "../services/category-summary.js";
 import { resolveDateRange } from "../services/date-utils.js";
 import { fetchFireflyTransactionsForMappings } from "../services/reconciliation-data.js";
@@ -27,7 +28,8 @@ export function registerFireflySummarizeUncategorized(server: McpServer, deps: T
         const range = resolveDateRange(input, deps.config.defaultLookbackDays);
         const mappings = await loadSelectedMappings(deps, input);
         const fireflyTransactions = await fetchFireflyTransactionsForMappings(deps.firefly, mappings, range);
-        const groups = summarizeUncategorized(fireflyTransactions);
+        const categoryRules = await loadCategoryRules(deps.config.categoryRulesFile);
+        const groups = summarizeUncategorized(fireflyTransactions, categoryRules.rules);
 
         return jsonToolResult({
           tool: "firefly_summarize_uncategorized",
@@ -41,6 +43,9 @@ export function registerFireflySummarizeUncategorized(server: McpServer, deps: T
           summary_groups: groups.map((group) => ({
             merchant: group.merchant,
             suggested_category: group.suggestedCategory,
+            confidence: group.suggestionConfidence,
+            reason: group.suggestionReason,
+            ...(group.matchingRuleId ? { matching_rule_id: group.matchingRuleId } : {}),
             count: group.count,
             total: group.total,
             example_transactions: group.examples.map(serializeTransaction)

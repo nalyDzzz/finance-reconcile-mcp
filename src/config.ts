@@ -15,7 +15,8 @@ const EnvSchema = z.object({
   MOCK_DATA: z.enum(["true", "false", "1", "0"]).default("false"),
   ACCOUNT_MAPPING_FILE: optionalString,
   IGNORED_FINDINGS_FILE: optionalString,
-  AUDIT_HISTORY_FILE: optionalString
+  AUDIT_HISTORY_FILE: optionalString,
+  CATEGORY_RULES_FILE: optionalString
 });
 
 function stripTrailingSlash(value: string): string {
@@ -23,12 +24,16 @@ function stripTrailingSlash(value: string): string {
 }
 
 function defaultAccountMappingFile(env: NodeJS.ProcessEnv): string {
+  return path.join(defaultUserConfigDir(env), "finance-reconcile-mcp", "account-map.json");
+}
+
+function defaultUserConfigDir(env: NodeJS.ProcessEnv): string {
   const baseConfigDir =
     process.platform === "win32"
       ? env.APPDATA || path.join(os.homedir(), "AppData", "Roaming")
       : env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
 
-  return path.join(baseConfigDir, "finance-reconcile-mcp", "account-map.json");
+  return baseConfigDir;
 }
 
 function defaultUserConfigFile(fileName: string): string {
@@ -94,6 +99,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const auditHistoryFile = resolveConfigFile(
     parsed.data.AUDIT_HISTORY_FILE ?? defaultUserConfigFile("audit-history.json")
   );
+  const categoryRulesFile = resolveConfigFile(
+    parsed.data.CATEGORY_RULES_FILE ??
+      path.join(defaultUserConfigDir(env), "finance-reconcile-mcp", "category-rules.json")
+  );
 
   return {
     simpleFinAccessUrl: parsed.data.SIMPLEFIN_ACCESS_URL ?? "https://mock.simplefin.local/simplefin",
@@ -105,6 +114,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     accountMappingFile,
     accountMappingFileDefaulted,
     ignoredFindingsFile,
-    auditHistoryFile
+    auditHistoryFile,
+    categoryRulesFile
   };
 }

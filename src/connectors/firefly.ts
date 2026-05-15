@@ -148,7 +148,7 @@ export class FireflyClient {
       headers: {
         "accept": "application/vnd.api+json, application/json",
         "authorization": `Bearer ${this.personalAccessToken}`,
-        "user-agent": "finance-reconcile-mcp/0.2"
+        "user-agent": "finance-reconcile-mcp/0.3"
       }
     });
 
@@ -288,6 +288,8 @@ export function normalizeFireflyTransactions(
       const split = splitValue as Record<string, unknown>;
       const sourceId = stringAttr(split, "source_id");
       const destinationId = stringAttr(split, "destination_id");
+      const sourceName = stringAttr(split, "source_name");
+      const destinationName = stringAttr(split, "destination_name");
       const touchesMappedAccount = sourceId === accountId || destinationId === accountId;
       if (!touchesMappedAccount) {
         return;
@@ -312,7 +314,7 @@ export function normalizeFireflyTransactions(
         externalIds: collectExternalIds(split),
         sourceAccountId: accountId,
         sourceAccountName:
-          (sourceId === accountId ? stringAttr(split, "source_name") : stringAttr(split, "destination_name")) ??
+          (sourceId === accountId ? sourceName : destinationName) ??
           mapping.firefly_name ??
           accountId,
         mappedFireflyAccountId: accountId,
@@ -326,6 +328,8 @@ export function normalizeFireflyTransactions(
           type: stringAttr(split, "type"),
           source_id: sourceId,
           destination_id: destinationId,
+          source_name: sourceName,
+          destination_name: destinationName,
           transaction_journal_id: journalId,
           group_id: group.id
         }

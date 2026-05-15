@@ -13,6 +13,14 @@ export interface AuditSnapshot {
   };
   summary: Record<string, unknown>;
   active_finding_fingerprints: string[];
+  active_findings: AuditSnapshotFinding[];
+}
+
+export interface AuditSnapshotFinding {
+  type: string;
+  group: string;
+  fingerprint: string;
+  summary: Record<string, unknown>;
 }
 
 export interface AuditHistoryFile {
@@ -34,7 +42,13 @@ const AuditSnapshotSchema = z.object({
     days: z.number().int().nonnegative()
   }),
   summary: z.record(z.unknown()),
-  active_finding_fingerprints: z.array(z.string().min(1))
+  active_finding_fingerprints: z.array(z.string().min(1)),
+  active_findings: z.array(z.object({
+    type: z.string().min(1),
+    group: z.string().min(1),
+    fingerprint: z.string().min(1),
+    summary: z.record(z.unknown())
+  })).default([])
 });
 
 const AuditHistoryFileSchema = z.object({
@@ -123,6 +137,7 @@ export function createAuditSnapshot(input: {
   range: AuditSnapshot["range"];
   summary: Record<string, unknown>;
   activeFindingFingerprints: string[];
+  activeFindings?: AuditSnapshotFinding[];
   now?: Date;
 }): AuditSnapshot {
   return {
@@ -130,6 +145,7 @@ export function createAuditSnapshot(input: {
     created_at: (input.now ?? new Date()).toISOString(),
     range: input.range,
     summary: input.summary,
-    active_finding_fingerprints: [...new Set(input.activeFindingFingerprints)].sort()
+    active_finding_fingerprints: [...new Set(input.activeFindingFingerprints)].sort(),
+    active_findings: input.activeFindings ?? []
   };
 }

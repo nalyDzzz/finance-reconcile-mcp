@@ -74,7 +74,7 @@ export class SimpleFinClient {
       method: "GET",
       headers: {
         "accept": "application/json",
-        "user-agent": "finance-reconcile-mcp/0.2",
+        "user-agent": "finance-reconcile-mcp/0.3",
         ...(authHeader ? { "authorization": authHeader } : {})
       }
     });

@@ -9,12 +9,16 @@ import { registerFireflySummarizeUncategorized } from "./tools/firefly-summarize
 import { registerReconcileCheckBalanceMismatches } from "./tools/reconcile-check-balance-mismatches.js";
 import { registerReconcileCheckStaleAccounts } from "./tools/reconcile-check-stale-accounts.js";
 import { registerReconcileFindMissingTransactions } from "./tools/reconcile-find-missing-transactions.js";
+import { registerReconcilePrepareReviewPlan } from "./tools/reconcile-prepare-review-plan.js";
 import { registerReconcileRunAudit } from "./tools/reconcile-run-audit.js";
+import { registerSetupAddCategoryRule } from "./tools/setup-add-category-rule.js";
 import { registerSetupGetStatus } from "./tools/setup-get-status.js";
 import { registerSetupIgnoreFinding } from "./tools/setup-ignore-finding.js";
+import { registerSetupListCategoryRules } from "./tools/setup-list-category-rules.js";
 import { registerSetupListFireflyAccounts } from "./tools/setup-list-firefly-accounts.js";
 import { registerSetupListIgnoredFindings } from "./tools/setup-list-ignored-findings.js";
 import { registerSetupListSimpleFinAccounts } from "./tools/setup-list-simplefin-accounts.js";
+import { registerSetupRemoveCategoryRule } from "./tools/setup-remove-category-rule.js";
 import { registerSetupSaveAccountMap } from "./tools/setup-save-account-map.js";
 import { registerSetupSuggestAccountMap } from "./tools/setup-suggest-account-map.js";
 import { registerSetupUnignoreFinding } from "./tools/setup-unignore-finding.js";
@@ -51,6 +55,7 @@ async function handleCli(args: string[]): Promise<boolean> {
           account_mapping_file_defaulted: config.accountMappingFileDefaulted,
           ignored_findings_file: config.ignoredFindingsFile,
           audit_history_file: config.auditHistoryFile,
+          category_rules_file: config.categoryRulesFile,
           simplefin_configured: Boolean(config.simpleFinAccessUrl),
           firefly_configured: Boolean(config.fireflyBaseUrl && config.fireflyPat)
         },
@@ -89,11 +94,12 @@ async function main(): Promise<void> {
 
   const server = new McpServer({
     name: "finance-reconcile-mcp",
-    version: "0.2.0"
+    version: "0.3.0"
   });
 
   registerReconcileFindMissingTransactions(server, deps);
   registerReconcileRunAudit(server, deps);
+  registerReconcilePrepareReviewPlan(server, deps);
   registerReconcileCheckStaleAccounts(server, deps);
   registerReconcileCheckBalanceMismatches(server, deps);
   registerFireflyFindPossibleDuplicates(server, deps);
@@ -101,6 +107,9 @@ async function main(): Promise<void> {
   registerSetupGetStatus(server, deps);
   registerSetupListSimpleFinAccounts(server, deps);
   registerSetupListFireflyAccounts(server, deps);
+  registerSetupListCategoryRules(server, deps);
+  registerSetupAddCategoryRule(server, deps);
+  registerSetupRemoveCategoryRule(server, deps);
   registerSetupListIgnoredFindings(server, deps);
   registerSetupIgnoreFinding(server, deps);
   registerSetupUnignoreFinding(server, deps);

@@ -15,6 +15,7 @@ import {
   loadAuditHistory
 } from "./audit-history.js";
 import { checkStaleAccounts, reconcileBalances } from "./balance-reconciliation.js";
+import { loadCategoryRules } from "./category-rules.js";
 import { summarizeUncategorized } from "./category-summary.js";
 import { findPossibleDuplicates } from "./duplicate-detection.js";
 import { resolveDateRange } from "./date-utils.js";
@@ -129,7 +130,8 @@ export async function runReconciliationAudit(deps: AuditDependencies, input: Aud
   const duplicateGroups = findPossibleDuplicates(fireflyTransactions, {
     minConfidence: options.minDuplicateConfidence
   });
-  const uncategorizedGroups = summarizeUncategorized(fireflyTransactions);
+  const categoryRules = await loadCategoryRules(deps.config.categoryRulesFile);
+  const uncategorizedGroups = summarizeUncategorized(fireflyTransactions, categoryRules.rules);
 
   const ignoredFile = await loadIgnoredFindings(deps.config.ignoredFindingsFile);
   const ignoredByFingerprint = ignoredFindingsByFingerprint(ignoredFile.ignored);
@@ -191,6 +193,9 @@ export async function runReconciliationAudit(deps: AuditDependencies, input: Aud
         summary: {
           merchant: group.merchant,
           suggested_category: group.suggestedCategory,
+          confidence: group.suggestionConfidence,
+          reason: group.suggestionReason,
+          ...(group.matchingRuleId ? { matching_rule_id: group.matchingRuleId } : {}),
           count: group.count,
           total: group.total,
           example_transactions: group.examples.slice(0, 2).map(compactTransaction)
@@ -198,6 +203,9 @@ export async function runReconciliationAudit(deps: AuditDependencies, input: Aud
         detail: {
           merchant: group.merchant,
           suggested_category: group.suggestedCategory,
+          confidence: group.suggestionConfidence,
+          reason: group.suggestionReason,
+          ...(group.matchingRuleId ? { matching_rule_id: group.matchingRuleId } : {}),
           count: group.count,
           total: group.total,
           example_transactions: group.examples.map(serializeTransaction)
@@ -228,7 +236,13 @@ export async function runReconciliationAudit(deps: AuditDependencies, input: Aud
       days: range.days
     },
     summary: summary as unknown as Record<string, unknown>,
-    activeFindingFingerprints: activeFindingFingerprints
+    activeFindingFingerprints: activeFindingFingerprints,
+    activeFindings: activeFindings.map((finding) => ({
+      type: finding.type,
+      group: finding.group,
+      fingerprint: finding.fingerprint,
+      summary: serializeFinding(finding, false)
+    }))
   });
   await appendAuditSnapshot(deps.config.auditHistoryFile, snapshot);
 

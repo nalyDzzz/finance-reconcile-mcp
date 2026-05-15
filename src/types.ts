@@ -11,6 +11,7 @@ export interface AppConfig {
   accountMappingFileDefaulted: boolean;
   ignoredFindingsFile: string;
   auditHistoryFile: string;
+  categoryRulesFile: string;
 }
 
 export interface AccountMapping {
@@ -113,9 +114,30 @@ export interface DuplicateGroup {
 export interface UncategorizedSummaryGroup {
   merchant: string;
   suggestedCategory: string;
+  suggestionConfidence: number;
+  suggestionReason: string;
+  matchingRuleId?: string;
   count: number;
   total: number;
   examples: NormalizedTransaction[];
+}
+
+export interface CategoryRule {
+  id: string;
+  match: string;
+  category: string;
+  created_at: string;
+}
+
+export interface CategoryRulesFile {
+  rules: CategoryRule[];
+}
+
+export interface CategorySuggestion {
+  category: string;
+  confidence: number;
+  reason: string;
+  matchingRuleId?: string;
 }
 
 export interface ServiceWarning {

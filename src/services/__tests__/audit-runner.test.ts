@@ -39,7 +39,8 @@ async function mockDeps(): Promise<AuditDependencies> {
       accountMappingFile: path.join(dir, "account-map.json"),
       accountMappingFileDefaulted: false,
       ignoredFindingsFile: path.join(dir, "ignored-findings.json"),
-      auditHistoryFile: path.join(dir, "audit-history.json")
+      auditHistoryFile: path.join(dir, "audit-history.json"),
+      categoryRulesFile: path.join(dir, "category-rules.json")
     },
     simplefin: new SimpleFinClient("https://mock.simplefin.local/simplefin", { mockData: true }),
     firefly: new FireflyClient("https://mock.firefly.local", "mock-token", { mockData: true })
@@ -74,6 +75,7 @@ describe("runReconciliationAudit", () => {
     const history = await loadAuditHistory(deps.config.auditHistoryFile);
     expect(history.snapshots).toHaveLength(1);
     expect(history.snapshots[0].active_finding_fingerprints).toHaveLength(7);
+    expect(history.snapshots[0].active_findings).toHaveLength(7);
     expect(history.snapshots[0].summary).toMatchObject({
       active_findings: 7,
       ignored_findings: 0

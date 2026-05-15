@@ -1,8 +1,12 @@
-import type { NormalizedTransaction, UncategorizedSummaryGroup } from "../types.js";
+import type { CategoryRule, CategorySuggestion, NormalizedTransaction, UncategorizedSummaryGroup } from "../types.js";
 import { roundMoney } from "./masking.js";
+import { suggestCategoryForTransaction } from "./category-rules.js";
 import { normalizeDescription } from "./transaction-matching.js";
 
-export function summarizeUncategorized(transactions: NormalizedTransaction[]): UncategorizedSummaryGroup[] {
+export function summarizeUncategorized(
+  transactions: NormalizedTransaction[],
+  rules: CategoryRule[] = []
+): UncategorizedSummaryGroup[] {
   const uncategorized = transactions.filter((transaction) => !transaction.category?.trim());
   const groups = new Map<string, NormalizedTransaction[]>();
 
@@ -14,15 +18,21 @@ export function summarizeUncategorized(transactions: NormalizedTransaction[]): U
   }
 
   return [...groups.entries()]
-    .map(([merchant, group]) => ({
-      merchant,
-      suggestedCategory: suggestCategory(merchant),
-      count: group.length,
-      total: roundMoney(group.reduce((sum, transaction) => sum + transaction.amount, 0)),
-      examples: group
-        .sort((a, b) => b.date.localeCompare(a.date))
-        .slice(0, 3)
-    }))
+    .map(([merchant, group]) => {
+      const suggestion = bestCategorySuggestion(group, rules);
+      return {
+        merchant,
+        suggestedCategory: suggestion.category,
+        suggestionConfidence: suggestion.confidence,
+        suggestionReason: suggestion.reason,
+        matchingRuleId: suggestion.matchingRuleId,
+        count: group.length,
+        total: roundMoney(group.reduce((sum, transaction) => sum + transaction.amount, 0)),
+        examples: group
+          .sort((a, b) => b.date.localeCompare(a.date))
+          .slice(0, 3)
+      };
+    })
     .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
 }
 
@@ -32,18 +42,12 @@ function merchantKey(description: string): string {
   return tokens.slice(0, 4).join(" ") || "unknown merchant";
 }
 
-function suggestCategory(merchant: string): string {
-  const rules: Array<[RegExp, string]> = [
-    [/\b(costco|kroger|safeway|whole foods|trader joes|grocery|market)\b/, "Groceries"],
-    [/\b(starbucks|coffee|cafe|restaurant|pizza|burger|taco|doordash|ubereats|grubhub)\b/, "Dining"],
-    [/\b(shell|chevron|exxon|bp|gas|fuel)\b/, "Fuel"],
-    [/\b(uber|lyft|transit|parking|airline|delta|united|southwest)\b/, "Transportation"],
-    [/\b(amazon|target|walmart|etsy|shop|store)\b/, "Shopping"],
-    [/\b(netflix|spotify|hulu|apple|google|microsoft|subscription)\b/, "Subscriptions"],
-    [/\b(power|electric|water|utility|internet|comcast|xfinity|phone|verizon|att)\b/, "Utilities"],
-    [/\b(pharmacy|cvs|walgreens|doctor|medical|health)\b/, "Medical"],
-    [/\b(payroll|salary|deposit|interest)\b/, "Income"]
-  ];
-
-  return rules.find(([pattern]) => pattern.test(merchant))?.[1] ?? "Needs Review";
+function bestCategorySuggestion(group: NormalizedTransaction[], rules: CategoryRule[]): CategorySuggestion {
+  return group
+    .map((transaction) => suggestCategoryForTransaction(transaction, rules))
+    .sort((a, b) => b.confidence - a.confidence)[0] ?? {
+      category: "Needs Review",
+      confidence: 0.2,
+      reason: "No transactions were available to suggest a category."
+    };
 }

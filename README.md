@@ -6,7 +6,7 @@ This project is for audit and reconciliation workflows. It does not create, edit
 
 ## Status
 
-v0.2.0 focuses on audit usability: compact audit output by default, stable finding fingerprints, local ignored findings, and local audit history. Matching heuristics and account mapping should still be reviewed before trusting the output.
+v0.3.0 focuses on category intelligence and reviewable proposals: local category rules, category suggestion confidence, and compact review plans from the latest audit. Matching heuristics, category suggestions, and account mapping should still be reviewed before trusting the output.
 
 ## Features
 
@@ -16,8 +16,10 @@ v0.2.0 focuses on audit usability: compact audit output by default, stable findi
 - Stale account and balance mismatch checks
 - Duplicate transaction detection in Firefly III
 - Uncategorized transaction summaries with suggested category labels
+- Local category rules for remembering merchant-to-category suggestions
 - Stable fingerprints for repeat audit findings
 - Local ignored-finding and audit-history files
+- Review plans that turn the latest audit into manual, non-mutating proposed actions
 - Compact JSON responses designed for AI agents and MCP clients
 
 ## Requirements
@@ -59,6 +61,13 @@ Ignored findings and audit history default to:
 - `~/.config/finance-reconcile-mcp/audit-history.json`
 
 Set `IGNORED_FINDINGS_FILE` or `AUDIT_HISTORY_FILE` only if you want custom local paths.
+
+Category rules default to the user config directory:
+
+- Linux/macOS: `~/.config/finance-reconcile-mcp/category-rules.json`
+- Windows: `%APPDATA%\finance-reconcile-mcp\category-rules.json`
+
+Set `CATEGORY_RULES_FILE` only if you want a custom local path.
 
 ## OpenClaw User Flow
 
@@ -132,7 +141,23 @@ OpenClaw should call `reconcile_find_missing_transactions` with:
 }
 ```
 
-## v0.2 Audit Workflow
+For category review, ask:
+
+```text
+Suggest categories for my uncategorized Firefly transactions.
+```
+
+OpenClaw should call `firefly_summarize_uncategorized`. The server may use local category rules, but it never applies categories to Firefly III.
+
+For a compact manual review queue, ask:
+
+```text
+Create a review plan for my finance audit.
+```
+
+OpenClaw should call `reconcile_prepare_review_plan` after an audit has been run. Review-plan actions always include `would_mutate_firefly: false` and `requires_manual_review: true`.
+
+## Audit And Review Workflow
 
 Run the compact audit first:
 
@@ -182,6 +207,42 @@ Every successful audit compares active finding fingerprints with the previous lo
 }
 ```
 
+Prepare a review plan from the latest local audit snapshot:
+
+```text
+Create a review plan for my finance audit.
+```
+
+The `reconcile_prepare_review_plan` tool returns missing transaction review items, duplicate review items, category suggestion items, stale account review items, and balance mismatch review items. These are reviewable proposals only. They do not create transactions, apply categories, delete duplicates, merge transactions, or write to Firefly III.
+
+## Category Rules
+
+Category rules are local memory for category suggestions. They are stored as JSON:
+
+```json
+{
+  "rules": [
+    {
+      "id": "category_rule:example",
+      "match": "king soopers",
+      "category": "Groceries",
+      "created_at": "2026-05-14T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+Rules match normalized transaction descriptions and merchant names. Add a rule when you want future summaries and review plans to suggest the same category for a merchant:
+
+```json
+{
+  "match": "king soopers",
+  "category": "Groceries"
+}
+```
+
+Use `setup_add_category_rule`, `setup_remove_category_rule`, and `setup_list_category_rules` to manage this local file. These setup tools only write local config. They never mutate Firefly III or SimpleFIN.
+
 ## Configuration
 
 Environment variables:
@@ -199,6 +260,8 @@ MOCK_DATA=false
 # IGNORED_FINDINGS_FILE=/absolute/path/to/ignored-findings.json
 # Optional. Defaults to ~/.config/finance-reconcile-mcp/audit-history.json
 # AUDIT_HISTORY_FILE=/absolute/path/to/audit-history.json
+# Optional. Defaults to the user config directory.
+# CATEGORY_RULES_FILE=/absolute/path/to/category-rules.json
 ```
 
 Notes:
@@ -314,6 +377,9 @@ Setup:
 - `setup_suggest_account_map` suggests an `account-map.json` draft by comparing SimpleFIN and Firefly III account names, currencies, and balances.
 - `setup_validate_account_map` validates an account-map object or the configured file, optionally checking live accounts.
 - `setup_save_account_map` writes the local `account-map.json` config file after `confirm_write: true`. It does not mutate financial data.
+- `setup_list_category_rules` lists local category suggestion rules.
+- `setup_add_category_rule` adds or updates a local category suggestion rule.
+- `setup_remove_category_rule` removes a local category suggestion rule.
 - `setup_list_ignored_findings` lists locally ignored finding fingerprints.
 - `setup_ignore_finding` writes a finding fingerprint to the local ignored-findings file.
 - `setup_unignore_finding` removes a finding fingerprint from the local ignored-findings file.
@@ -321,6 +387,7 @@ Setup:
 Reconciliation:
 
 - `reconcile_run_audit` runs the full audit without mutating financial systems. It returns compact output by default and writes a local audit-history snapshot.
+- `reconcile_prepare_review_plan` creates reviewable proposed actions from the latest audit snapshot. Every action is manual-review-only and has `would_mutate_firefly: false`.
 - `reconcile_find_missing_transactions` compares mapped SimpleFIN and Firefly III transactions and returns SimpleFIN transactions that appear missing from Firefly III.
 - `reconcile_check_stale_accounts` compares the latest transaction dates per mapped account.
 - `reconcile_check_balance_mismatches` compares SimpleFIN balances with Firefly III account balances.
@@ -366,6 +433,21 @@ Show ignored findings in the audit output:
 {
   "days": 30,
   "include_ignored": true
+}
+```
+
+Create a review plan from the latest audit:
+
+```json
+{}
+```
+
+Add a local category rule:
+
+```json
+{
+  "match": "king soopers",
+  "category": "Groceries"
 }
 ```
 
@@ -457,6 +539,13 @@ npm run build
 
 `npm pack` and `npm publish` run `npm run build` automatically through the `prepack` script.
 
+### Release Checklist
+
+1. `npm version minor` or `npm version patch`
+2. `git push origin main --follow-tags`
+3. `npm publish`
+4. `npm view finance-reconcile-mcp version`
+
 ### Mock Mode
 
 Set `MOCK_DATA=true` to run against deterministic fixtures instead of real HTTP connectors. The fixture set includes one missing transaction, one duplicate Firefly transaction group, one stale account, one balance mismatch, and uncategorized transactions.
@@ -503,6 +592,8 @@ An empty result can mean Firefly III is up to date, the date range is too narrow
 - No Firefly III write endpoints are implemented.
 - No SimpleFIN mutation endpoints exist in this project.
 - `reconcile_run_audit` writes local audit-history JSON only.
+- `reconcile_prepare_review_plan` reads local audit history only and does not mutate financial systems.
+- Category rule tools write local category-rules JSON only.
 - Ignored-finding tools write local ignored-findings JSON only.
 - `setup_save_account_map` only writes local config after explicit confirmation.
 - Secrets are read from environment variables and are not logged intentionally.

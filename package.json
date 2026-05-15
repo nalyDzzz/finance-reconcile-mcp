@@ -1,6 +1,6 @@
 {
   "name": "finance-reconcile-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Read-only MCP server for reconciling SimpleFIN Bridge against Firefly III.",
   "license": "MIT",
   "type": "module",
